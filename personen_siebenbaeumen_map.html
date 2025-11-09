@@ -69,11 +69,11 @@
 
 <script>
 (function(){
-    // Data for people (name, color, coords, popup HTML)
+    // Data for people (name, color, birth/death place names, coords, popup HTML)
     var people = [
-        { name: "Albert Bohnsack", color: "red", birth: "Siebenbäumen", coordsBirth: [53.7503512, 10.5292609], coordsDeath: [51.1089776, 17.0326689], popup: "<b>Albert Bohnsack</b><br>Geburtsort: Siebenbäumen<br>Todesort: (Beispiel)" },
-        { name: "Ewald Glubs", color: "blue", birth: "Steinhorst", coordsBirth: [53.7206815, 10.4834423], coordsDeath: [44.6054434, 33.5220842], popup: "<b>Ewald Glubs</b><br>Geburtsort: Steinhorst<br>Todesort: (Beispiel)" },
-        { name: "Herbert Dabelstein", color: "green", birth: "Siebenbäumen", coordsBirth: [53.7503512, 10.5292609], coordsDeath: [47.3470611, -3.1548668], popup: "<b>Herbert Dabelstein</b><br>Geburtsort: Siebenbäumen<br>Todesort: (Beispiel)" }
+        { name: "Albert Bohnsack", color: "red", birth: "Siebenbäumen", death: "Breslau", coordsBirth: [53.7503512, 10.5292609], coordsDeath: [51.1089776, 17.0326689] },
+        { name: "Ewald Glubs", color: "blue", birth: "Steinhorst", death: "Sewastopol", coordsBirth: [53.7206815, 10.4834423], coordsDeath: [44.6054434, 33.5220842] },
+        { name: "Herbert Dabelstein", color: "green", birth: "Siebenbäumen", death: "Brest", coordsBirth: [53.7503512, 10.5292609], coordsDeath: [47.3470611, -3.1548668] }
     ];
 
     // Initialize map
@@ -86,18 +86,20 @@
         // marker at birth
         var iconBirth = L.AwesomeMarkers.icon({ markerColor: p.color, icon: 'user', prefix: 'fa', iconColor: 'white' });
         var mBirth = L.marker(p.coordsBirth, { icon: iconBirth }).addTo(map);
-        mBirth.bindPopup(p.popup + '<br><small>Ort (Geburt)</small>');
+        var popupBirthHtml = '<div><b>' + p.name + '</b><br>Geburtsort: ' + (p.birth || '(nicht angegeben)') + '</div>';
+        mBirth.bindPopup(popupBirthHtml);
         bounds.push(p.coordsBirth);
 
         // marker at death
-        var iconDeath = L.AwesomeMarkers.icon({ markerColor: p.color, icon: 'crosshairs', prefix: 'fa', iconColor: 'white' });
+        var iconDeath = L.AwesomeMarkers.icon({ markerColor: p.color, icon: 'times', prefix: 'fa', iconColor: 'white' });
         var mDeath = L.marker(p.coordsDeath, { icon: iconDeath }).addTo(map);
-        mDeath.bindPopup(p.popup + '<br><small>Ort (Tod)</small>');
+        var popupDeathHtml = '<div><b>' + p.name + '</b><br>Todesort: ' + (p.death || '(nicht angegeben)') + '</div>';
+        mDeath.bindPopup(popupDeathHtml);
         bounds.push(p.coordsDeath);
 
         // polyline between birth and death
         var poly = L.polyline([p.coordsBirth, p.coordsDeath], { color: p.color, weight: 2 }).addTo(map);
-        poly.bindTooltip('<div>' + p.name + '</div>', { sticky: true });
+        poly.bindTooltip('<div>' + p.name + '<br><small>Geburt: ' + (p.birth || '(?)') + '<br>Tod: ' + (p.death || '(?)') + '</small></div>', { sticky: true });
 
         // add to legend
         var legendItems = document.getElementById('legendItems');
