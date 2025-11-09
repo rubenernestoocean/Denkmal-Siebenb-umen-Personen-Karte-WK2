@@ -2,176 +2,131 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- CSS: Leaflet, Bootstrap, FontAwesome, AwesomeMarkers -->
+    <!-- CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.0/css/all.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css" />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/python-visualization/folium/folium/templates/leaflet.awesome.rotate.min.css" />
 
     <style>
-        html, body {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-        }
+        html, body { height: 100%; margin: 0; }
         .leaflet-container { font-size: 1rem; }
-        /* Make the folium map container fill the viewport */
-        .folium-map {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 100vh;
-            width: 100%;
-        }
-        /* Personen-Legende styling */
+        .map-container { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+
+        /* Legend */
         .personen-legende {
             position: fixed;
-            bottom: 50px;
-            left: 50px;
-            width: 220px;
-            max-width: 40%;
-            height: auto;
-            background-color: white;
-            border: 2px solid grey;
-            z-index: 9999;
-            font-size: 14px;
-            padding: 10px;
+            bottom: 18px;
+            left: 18px;
+            width: 240px;
+            max-height: 45vh;
             overflow: auto;
+            background: rgba(255,255,255,0.95);
+            border: 1px solid #888;
+            padding: 8px;
+            z-index: 9999;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            font-size: 14px;
+            border-radius: 4px;
         }
-        .personen-legende i {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            margin-right: 5px;
-            vertical-align: middle;
+        .personen-legende h4 { margin: 0 0 8px 0; font-size: 16px; }
+        .personen-legende .legend-item { margin-bottom: 6px; display:flex; align-items:center; }
+        .personen-legende .swatch { width:14px; height:14px; margin-right:8px; border-radius:2px; }
+
+        /* Mobile: collapsible legend */
+        @media (max-width: 600px) {
+            .personen-legende { left: 10px; right: 10px; width: auto; max-height: 35vh; }
+            .legend-toggle { display:block; margin-bottom:8px; }
         }
+        .legend-toggle { display:none; cursor:pointer; color:#007bff; background:none; border:none; padding:0; }
     </style>
 
-    <!-- JS: jQuery, Bootstrap, Leaflet, AwesomeMarkers -->
+    <!-- JS libs (jQuery then Bootstrap then Leaflet) -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
 
     <script>
-        /* Ensure these globals are defined as Folium expects */
+        // Folium compatibility globals
         L_NO_TOUCH = false;
         L_DISABLE_3D = false;
     </script>
 </head>
 <body>
 
-<div class="personen-legende">
-<b>Personen-Legende</b><br>
-<i style='background:red;'></i> Albert Bohnsack<br>
-<i style='background:blue;'></i> Ewald Glubs<br>
-<i style='background:gray;'></i> weitere Personen
+<div class="personen-legende" id="personen-legende">
+    <button class="legend-toggle" id="legendToggle">☰ Legende anzeigen</button>
+    <h4>Personen-Legende</h4>
+    <div id="legendItems"></div>
 </div>
 
-<div class="folium-map" id="map_21252aa77d575d91a03b2668df530c05"></div>
+<div class="map-container">
+    <div id="map_21252aa77d575d91a03b2668df530c05" class="folium-map" style="width:100%; height:100%;"></div>
+</div>
 
 <script>
-    // Map initialization (kept from original, only minor cleanups)
-    var map_21252aa77d575d91a03b2668df530c05 = L.map("map_21252aa77d575d91a03b2668df530c05", {
-        center: [51.0, 10.0],
-        crs: L.CRS.EPSG3857,
-        zoom: 5,
-        zoomControl: true,
-        preferCanvas: false
+(function(){
+    // Data for people (name, color, coords, popup HTML)
+    var people = [
+        { name: "Albert Bohnsack", color: "red", birth: "Siebenbäumen", coordsBirth: [53.7503512, 10.5292609], coordsDeath: [51.1089776, 17.0326689], popup: "<b>Albert Bohnsack</b><br>Geburtsort: Siebenbäumen<br>Todesort: (Beispiel)" },
+        { name: "Ewald Glubs", color: "blue", birth: "Steinhorst", coordsBirth: [53.7206815, 10.4834423], coordsDeath: [44.6054434, 33.5220842], popup: "<b>Ewald Glubs</b><br>Geburtsort: Steinhorst<br>Todesort: (Beispiel)" },
+        { name: "Herbert Dabelstein", color: "green", birth: "Siebenbäumen", coordsBirth: [53.7503512, 10.5292609], coordsDeath: [47.3470611, -3.1548668], popup: "<b>Herbert Dabelstein</b><br>Geburtsort: Siebenbäumen<br>Todesort: (Beispiel)" }
+    ];
+
+    // Initialize map
+    var map = L.map('map_21252aa77d575d91a03b2668df530c05', { center:[51.0,10.0], zoom:5, zoomControl:true });
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution: '&copy; OpenStreetMap contributors' }).addTo(map);
+
+    // Build markers and legend from data
+    var bounds = [];
+    people.forEach(function(p){
+        // marker at birth
+        var iconBirth = L.AwesomeMarkers.icon({ markerColor: p.color, icon: 'user', prefix: 'fa', iconColor: 'white' });
+        var mBirth = L.marker(p.coordsBirth, { icon: iconBirth }).addTo(map);
+        mBirth.bindPopup(p.popup + '<br><small>Ort (Geburt)</small>');
+        bounds.push(p.coordsBirth);
+
+        // marker at death
+        var iconDeath = L.AwesomeMarkers.icon({ markerColor: p.color, icon: 'crosshairs', prefix: 'fa', iconColor: 'white' });
+        var mDeath = L.marker(p.coordsDeath, { icon: iconDeath }).addTo(map);
+        mDeath.bindPopup(p.popup + '<br><small>Ort (Tod)</small>');
+        bounds.push(p.coordsDeath);
+
+        // polyline between birth and death
+        var poly = L.polyline([p.coordsBirth, p.coordsDeath], { color: p.color, weight: 2 }).addTo(map);
+        poly.bindTooltip('<div>' + p.name + '</div>', { sticky: true });
+
+        // add to legend
+        var legendItems = document.getElementById('legendItems');
+        var item = document.createElement('div'); item.className = 'legend-item';
+        var sw = document.createElement('span'); sw.className = 'swatch'; sw.style.background = p.color;
+        var label = document.createElement('span'); label.innerHTML = p.name;
+        item.appendChild(sw); item.appendChild(label);
+        legendItems.appendChild(item);
     });
 
-    var tile_layer_4725ab43a115bb27863ccc71cf4e543c = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        minZoom: 0,
-        maxZoom: 19,
-        maxNativeZoom: 19,
-        noWrap: false,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        subdomains: 'abc',
-        detectRetina: false,
-        tms: false,
-        opacity: 1
+    if(bounds.length) map.fitBounds(bounds);
+
+    // Legend toggle for small screens
+    var toggle = document.getElementById('legendToggle');
+    var legend = document.getElementById('personen-legende');
+    toggle.addEventListener('click', function(){
+        var items = document.getElementById('legendItems');
+        if(items.style.display === 'none' || items.style.display === ''){
+            items.style.display = 'block';
+            toggle.textContent = '− Legende verbergen';
+        } else {
+            items.style.display = 'none';
+            toggle.textContent = '☰ Legende anzeigen';
+        }
     });
-    tile_layer_4725ab43a115bb27863ccc71cf4e543c.addTo(map_21252aa77d575d91a03b2668df530c05);
-
-    // --- Markers, icons and popups (original content preserved) ---
-
-    var marker_d7328bb4109d4ff6f3d5a9825f45e230 = L.marker([53.7503512, 10.5292609]).addTo(map_21252aa77d575d91a03b2668df530c05);
-    var icon_cb08edccfd97e81c0b2a836b7eff74be = L.AwesomeMarkers.icon({
-        markerColor: "gray",
-        iconColor: "white",
-        icon: "user",
-        prefix: "fa",
-        extraClasses: "fa-rotate-0"
-    });
-    var popup_260fd2e935513310ab1ada12eeb37482 = L.popup({ maxWidth: "100%" });
-    var html_673257baa2a7788c4cc9ef13252e0046 = $("<div id=\"html_673257baa2a7788c4cc9ef13252e0046\" style=\"width: 100%; height: 100%;\"><b>Albert Bohnsack</b><br>Geburtsort: Siebenbäumen ...</div>");
-    popup_260fd2e935513310ab1ada12eeb37482.setContent(html_673257baa2a7788c4cc9ef13252e0046);
-    marker_d7328bb4109d4ff6f3d5a9825f45e230.bindPopup(popup_260fd2e935513310ab1ada12eeb37482);
-    marker_d7328bb4109d4ff6f3d5a9825f45e230.setIcon(icon_cb08edccfd97e81c0b2a836b7eff74be);
-
-    var marker_ebbda09fef13cdb321cff9b1cff87c90 = L.marker([51.1089776, 17.0326689]).addTo(map_21252aa77d575d91a03b2668df530c05);
-    var icon_12d20e39bb3dfe5791e334b64575fd66 = L.AwesomeMarkers.icon({
-        markerColor: "red",
-        iconColor: "white",
-        icon: "user",
-        prefix: "fa",
-        extraClasses: "fa-rotate-0"
-    });
-    var popup_bbed84b15c09de5f073805cdafc1513d = L.popup({ maxWidth: "100%" });
-    var html_29d5479e5a576bcaa0aa717bbd25f2b5 = $("<div id=\"html_29d5479e5a576bcaa0aa717bbd25f2b5\" style=\"width: 100%; height: 100%;\"><b>Albert Bohnsack</b><br>Geburtsort: Siebenbäumen ...</div>");
-    popup_bbed84b15c09de5f073805cdafc1513d.setContent(html_29d5479e5a576bcaa0aa717bbd25f2b5);
-    marker_ebbda09fef13cdb321cff9b1cff87c90.bindPopup(popup_bbed84b15c09de5f073805cdafc1513d);
-    marker_ebbda09fef13cdb321cff9b1cff87c90.setIcon(icon_12d20e39bb3dfe5791e334b64575fd66);
-
-    var poly_line_4ad2c283d0a19a5ca79c88aaeebcbf40 = L.polyline([[53.7503512, 10.5292609], [51.1089776, 17.0326689]], { bubblingMouseEvents: true, color: "red", fill: false }).addTo(map_21252aa77d575d91a03b2668df530c05);
-    poly_line_4ad2c283d0a19a5ca79c88aaeebcbf40.bindTooltip("<div> Albert Bohnsack </div>", { sticky: true });
-
-    var marker_57d719cc50343d6f7c0028cfa51cce2f = L.marker([53.7206815, 10.4834423]).addTo(map_21252aa77d575d91a03b2668df530c05);
-    var icon_727d12d2679dd9b2ad39ad68159c94a0 = L.AwesomeMarkers.icon({ markerColor: "gray", iconColor: "white", icon: "user", prefix: "fa", extraClasses: "fa-rotate-0" });
-    var popup_244c2ef425dc36d522990d2ee599349b = L.popup({ maxWidth: "100%" });
-    var html_f8408b1fccab93ffed346bafb3b934ea = $("<div id=\"html_f8408b1fccab93ffed346bafb3b934ea\" style=\"width: 100%; height: 100%;\"><b>Ewald Glubs</b><br>Geburtsort: Steinhorst ...</div>");
-    popup_244c2ef425dc36d522990d2ee599349b.setContent(html_f8408b1fccab93ffed346bafb3b934ea);
-    marker_57d719cc50343d6f7c0028cfa51cce2f.bindPopup(popup_244c2ef425dc36d522990d2ee599349b);
-    marker_57d719cc50343d6f7c0028cfa51cce2f.setIcon(icon_727d12d2679dd9b2ad39ad68159c94a0);
-
-    var marker_568489fa5f3c0e5b298718e5392a4e7a = L.marker([44.6054434, 33.5220842]).addTo(map_21252aa77d575d91a03b2668df530c05);
-    var icon_a256a4111b847d41f5d8487a2386e2bb = L.AwesomeMarkers.icon({ markerColor: "blue", iconColor: "white", icon: "user", prefix: "fa", extraClasses: "fa-rotate-0" });
-    var popup_aa2eb4e49ce4ef7719b9e557090d2864 = L.popup({ maxWidth: "100%" });
-    var html_6b0e01ca8f600793d275470450a3b594 = $("<div id=\"html_6b0e01ca8f600793d275470450a3b594\" style=\"width: 100%; height: 100%;\"><b>Ewald Glubs</b><br>Geburtsort: Steinhorst ...</div>");
-    popup_aa2eb4e49ce4ef7719b9e557090d2864.setContent(html_6b0e01ca8f600793d275470450a3b594);
-    marker_568489fa5f3c0e5b298718e5392a4e7a.bindPopup(popup_aa2eb4e49ce4ef7719b9e557090d2864);
-    marker_568489fa5f3c0e5b298718e5392a4e7a.setIcon(icon_a256a4111b847d41f5d8487a2386e2bb);
-
-    var poly_line_42a487a25706d38a7dca613cb3dc4e7d = L.polyline([[53.7206815, 10.4834423], [44.6054434, 33.5220842]], { bubblingMouseEvents: true, color: "blue", fill: false }).addTo(map_21252aa77d575d91a03b2668df530c05);
-    poly_line_42a487a25706d38a7dca613cb3dc4e7d.bindTooltip("<div> Ewald Glubs </div>", { sticky: true });
-
-    var marker_42e4d3d49552b1ceec16e2b26aa8115e = L.marker([53.7503512, 10.5292609]).addTo(map_21252aa77d575d91a03b2668df530c05);
-    var icon_3a3d2e97ea53262222b32065fe192805 = L.AwesomeMarkers.icon({ markerColor: "gray", iconColor: "white", icon: "user", prefix: "fa", extraClasses: "fa-rotate-0" });
-    var popup_8ceaf0fa5fd7a8e8bdcfa40d3a324eeb = L.popup({ maxWidth: "100%" });
-    var html_db510837c89a597e1d2f6271a31ad824 = $("<div id=\"html_db510837c89a597e1d2f6271a31ad824\" style=\"width: 100%; height: 100%;\"><b>Herbert Dabelstein</b><br>Geburtsort: Siebenbäumen ...</div>");
-    popup_8ceaf0fa5fd7a8e8bdcfa40d3a324eeb.setContent(html_db510837c89a597e1d2f6271a31ad824);
-    marker_42e4d3d49552b1ceec16e2b26aa8115e.bindPopup(popup_8ceaf0fa5fd7a8e8bdcfa40d3a324eeb);
-    marker_42e4d3d49552b1ceec16e2b26aa8115e.setIcon(icon_3a3d2e97ea53262222b32065fe192805);
-
-    var marker_23b1bb0f7df371bb0afbc276f049980f = L.marker([47.3470611, -3.1548668]).addTo(map_21252aa77d575d91a03b2668df530c05);
-    var icon_191b1951e5ac8c53d32aae35d3c52f9b = L.AwesomeMarkers.icon({ markerColor: "green", iconColor: "white", icon: "user", prefix: "fa", extraClasses: "fa-rotate-0" });
-    var popup_66da51ca1530ee6f06a1ddceafae757b = L.popup({ maxWidth: "100%" });
-    var html_f99211901c55963784747800d4c0515a = $("<div id=\"html_f99211901c55963784747800d4c0515a\" style=\"width: 100%; height: 100%;\"><b>Herbert Dabelstein</b><br>Geburtsort: Siebenbäumen ...</div>");
-    popup_66da51ca1530ee6f06a1ddceafae757b.setContent(html_f99211901c55963784747800d4c0515a);
-    marker_23b1bb0f7df371bb0afbc276f049980f.bindPopup(popup_66da51ca1530ee6f06a1ddceafae757b);
-    marker_23b1bb0f7df371bb0afbc276f049980f.setIcon(icon_191b1951e5ac8c53d32aae35d3c52f9b);
-
-    var poly_line_96c4db7d737501e4530d770113e1b6dc = L.polyline([[53.7503512, 10.5292609], [47.3470611, -3.1548668]], { bubblingMouseEvents: true, color: "green", fill: false }).addTo(map_21252aa77d575d91a03b2668df530c05);
-    poly_line_96c4db7d737501e4530d770113e1b6dc.bindTooltip("<div> Herbert Dabelstein </div>", { sticky: true });
-
-    map_21252aa77d575d91a03b2668df530c05.fitBounds([[53.7503512, 10.5292609], [51.1089776, 17.0326689], [53.7206815, 10.4834423], [44.6054434, 33.5220842], [53.7503512, 10.5292609], [47.3470611, -3.1548668]], {});
-
+    // Hide legend items on very small screens by default
+    if(window.innerWidth <= 600){ document.getElementById('legendItems').style.display = 'none'; toggle.style.display = 'block'; }
+})();
 </script>
+
 </body>
 </html>
